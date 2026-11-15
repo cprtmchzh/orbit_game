@@ -1,0 +1,65 @@
+{
+  "candidateCommit": "6ca9db079e4c90c2ae048a5ac3f5ea9c6353939b",
+  "node": "24.22.1",
+  "playwright": "1.62.1",
+  "channel": "msedge",
+  "manifestSha256": "fcd563147fec2b91bcd63937067aa366f734f59336868ee33951fe2a68bfc403",
+  "browser": "157.0.4341.60",
+  "viewport": "360x800",
+  "retries": 20,
+  "mounted": [
+    "index.html",
+    "assets/index-BK35xXlw.js",
+    "assets/index-BbvW2HQW.css"
+  ],
+  "layoutFits": true,
+  "measuredRadii": [
+    105.11,
+    155.03,
+    105.02
+  ],
+  "loop": {
+    "results": 21,
+    "maxPending": 1,
+    "sameFrame": 0,
+    "frames": 11710,
+    "listeners": {
+      "start/click": 1,
+      "pause/click": 1,
+      "resume/click": 1,
+      "retry/click": 1,
+      "restart/click": 1,
+      "CANVAS/pointerdown": 1,
+      "document/keydown": 1,
+      "document/visibilitychange": 1
+    },
+    "reads": 22,
+    "writes": 1
+  },
+  "afterLoadRequests": [],
+  "consoleErrors": [],
+  "restoredBest": "2.0초",
+  "browserVisibilityEvents": [],
+  "syntheticVisibilityTransition": [
+    "RUNNING",
+    "PAUSED",
+    "PAUSED"
+  ],
+  "visibilityMethod": "simulated visibilitychange; native tab hiding unverified",
+  "pauseTime": "0.4초",
+  "longFramePaused": true,
+  "storage": {
+    "corrupt": {
+      "recoveredBest": "2.0초",
+      "retried": true
+    },
+    "denied": {
+      "recoveredBest": "2.0초",
+      "retried": true
+    },
+    "writeDenied": {
+      "recoveredBest": "2.0초",
+      "retried": true
+    }
+  }
+}
