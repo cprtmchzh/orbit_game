@@ -1,5 +1,5 @@
 import { geometry, noteHeadX } from './config'
-import type { ChartHead, Circle, Collision, Lane, Movement, PlayableChart, VisibleHead } from './contracts'
+import type { ChartHead, Circle, Lane, Movement, VisibleHead } from './contracts'
 
 const radius = geometry.playerRadius + geometry.headRadius
 export const contactHalfSec = radius / geometry.scrollUnitsPerSec
@@ -47,28 +47,16 @@ function movingContact(a: number, b: number, at: number, targetY: number, yAt: (
   return movingContact(a, mid, at, targetY, yAt) ?? movingContact(mid, b, at, targetY, yAt)
 }
 
-export function firstCollision(chart: PlayableChart, lane: number, move: Movement | null, from: number, to: number): Collision | null {
-  const yAt = (sec: number) => playerY(chart.lanes, lane, move, sec)
-  let first: Collision | null = null
-  for (let i = firstHeadAt(chart.heads, from - contactHalfSec); i < chart.heads.length; i++) {
-    const note = chart.heads[i]
-    const left = Math.max(from, note.arrivalSec - contactHalfSec)
-    const right = Math.min(first?.songSec ?? to, note.arrivalSec + contactHalfSec)
-    if (left > right) break
-    const y = chart.lanes[note.laneIndex].y
-    let hit: number | null
-    if (move) {
-      hit = movingContact(left, right, note.arrivalSec, y, yAt)
-    } else {
-      const dy = y - chart.lanes[lane].y
-      if (Math.abs(dy) > radius) continue
-      const width = Math.sqrt(radius * radius - dy * dy) / geometry.scrollUnitsPerSec
-      hit = Math.max(left, note.arrivalSec - width)
-      if (hit > right || hit > note.arrivalSec + width) continue
-    }
-    if (hit !== null && (!first || hit < first.songSec)) {
-      first = { songSec: hit, player: playerCircle(yAt(hit)), noteHead: headCircle(note, y, hit) }
-    }
-  }
-  return first
+/** First contact with one head during a single uninterrupted movement segment. */
+export function headContact(lanes: readonly Lane[], lane: number, move: Movement | null, note: ChartHead, from: number, to: number): number | null {
+  const left = Math.max(from, note.arrivalSec - contactHalfSec)
+  const right = Math.min(to, note.arrivalSec + contactHalfSec)
+  if (left > right) return null
+  const y = lanes[note.laneIndex].y
+  if (move) return movingContact(left, right, note.arrivalSec, y, sec => playerY(lanes, lane, move, sec))
+  const dy = y - lanes[lane].y
+  if (Math.abs(dy) > radius) return null
+  const width = Math.sqrt(radius * radius - dy * dy) / geometry.scrollUnitsPerSec
+  const hit = Math.max(left, note.arrivalSec - width)
+  return hit <= right && hit <= note.arrivalSec + width ? hit : null
 }

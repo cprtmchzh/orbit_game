@@ -1,6 +1,6 @@
 import { geometry, timing } from './config'
-import type { AudioClockSample, Collision, Direction, GameCommand, GameController, GameSnapshot, GameState, Movement, PlayableChart, VisibleHead } from './contracts'
-import { contactHalfSec, firstCollision, firstHeadAt, headCircle, playerCircle, playerY } from './rules'
+import type { AudioClockSample, Direction, GameCommand, GameController, GameSnapshot, GameState, Movement, PlayableChart, VisibleHead } from './contracts'
+import { contactHalfSec, firstHeadAt, headCircle, headContact, playerCircle, playerY } from './rules'
 
 export function createGame(chart: PlayableChart): GameController {
   const initialLane = Math.floor((chart.lanes.length - 1) / 2)
@@ -12,7 +12,16 @@ export function createGame(chart: PlayableChart): GameController {
   let lane = initialLane
   let move: Movement | null = null
   let queued: Direction | null = null
-  let collision: Collision | null = null
+  const collected = new Set<number>()
+  let firstOpen = 0
+  let misses = 0
+
+  function closeWindows(time: number) {
+    while (firstOpen < chart.heads.length && chart.heads[firstOpen].arrivalSec + contactHalfSec < time) {
+      if (!collected.has(firstOpen)) misses++
+      firstOpen++
+    }
+  }
 
   function beginMove(direction: Direction) {
     const to = lane + (direction === 'up' ? -1 : 1)
@@ -26,13 +35,14 @@ export function createGame(chart: PlayableChart): GameController {
     const until = Math.min(to, stageEnd)
     do {
       const end = Math.min(move?.endSec ?? until, until)
-      collision = firstCollision(chart, lane, move, songSec, end)
-      if (collision) {
-        songSec = collision.songSec
-        state = 'FAILED'
-        queued = null
-        return
+      for (let i = firstOpen; i < chart.heads.length; i++) {
+        const head = chart.heads[i]
+        if (head.arrivalSec - contactHalfSec > end) break
+        if (!collected.has(i) && headContact(chart.lanes, lane, move, head, songSec, end) !== null) {
+          collected.add(i)
+        }
       }
+      closeWindows(end)
       songSec = end
       if (move && songSec >= move.endSec) {
         lane = move.toLane
@@ -42,6 +52,7 @@ export function createGame(chart: PlayableChart): GameController {
       }
     } while (songSec < until)
     if (to >= chart.audioEndSec && to > lastHeadEnd) {
+      closeWindows(to)
       state = 'CLEARED'
       queued = null
     } else {
@@ -71,7 +82,9 @@ export function createGame(chart: PlayableChart): GameController {
       lane = initialLane
       move = null
       queued = null
-      collision = null
+      collected.clear()
+      firstOpen = 0
+      misses = 0
       resumeRemainingSec = 0
       advance(clock.songSec)
       return
@@ -102,12 +115,13 @@ export function createGame(chart: PlayableChart): GameController {
     for (let i = firstHeadAt(chart.heads, songSec - pastSec); i < chart.heads.length; i++) {
       const head = chart.heads[i]
       if (head.arrivalSec > songSec + timing.lookaheadSec) break
+      if (collected.has(i)) continue
       visibleHeads.push(headCircle(head, chart.lanes[head.laneIndex].y, songSec))
     }
     return {
       state, songSec, resumeRemainingSec, progress: Math.min(1, Math.max(0, songSec / chart.audioEndSec)),
       player: playerCircle(playerY(chart.lanes, lane, move, songSec)), movement: move, queuedDirection: queued,
-      visibleHeads, collision,
+      visibleHeads, collision: null, hits: collected.size, misses, totalNotes: chart.heads.length,
     }
   }
   return { update, dispatch, getSnapshot }

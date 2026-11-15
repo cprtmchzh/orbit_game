@@ -6,8 +6,12 @@ import { createGame } from '../../src/game'
 // #23 owns the actual asset. An isolated core checkout can point here via ORBIT_REPLAY_CHART.
 const file = process.env.ORBIT_REPLAY_CHART || new URL('../../public/songs/glass-steps.json', import.meta.url)
 const moves = [
-  [-1.5, 'up'], [-1.2, 'up'], [0.54, 'down'], [0.82, 'up'],
-  [4.82, 'down'], [5.12, 'up'], [7.6, 'down'], [8.18, 'up'],
+  [0.12, 'up'], [0.53, 'up'], [0.78, 'down'], [1.1, 'down'], [1.3, 'down'],
+  [2.1, 'up'], [2.53, 'down'], [2.7, 'down'], [3.1, 'up'], [3.6, 'up'],
+  [4.1, 'up'], [4.78, 'up'], [5.1, 'down'], [5.53, 'down'], [5.7, 'down'],
+  [6.03, 'down'], [6.28, 'up'], [6.6, 'up'], [7.1, 'up'], [7.3, 'up'],
+  [8.1, 'down'], [8.6, 'down'], [9.03, 'down'], [9.28, 'down'], [9.6, 'up'],
+  [10.03, 'up'], [10.2, 'up'], [10.6, 'down'],
 ]
 
 it.skipIf(!existsSync(file)).each([30, 60, 120, 1])('clears the shipped Glass Steps chart at %i Hz', hz => {
@@ -26,5 +30,5 @@ it.skipIf(!existsSync(file)).each([30, 60, 120, 1])('clears the shipped Glass St
     }
     game.update(clock(t))
   }
-  expect(game.getSnapshot()).toMatchObject({ state: 'CLEARED', songSec: 12, progress: 1, collision: null })
+  expect(game.getSnapshot()).toMatchObject({ state: 'CLEARED', songSec: 12, progress: 1, hits: 24, misses: 0, totalNotes: 24 })
 })
