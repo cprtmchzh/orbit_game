@@ -72,7 +72,7 @@ export function createUI(root: HTMLElement, actions: UIActions) {
         <button type="button" data-command="pause">일시정지</button></div>
       <div class="status-line"><h3 tabindex="-1" data-status aria-live="polite"></h3><span data-clock></span></div>
       <progress max="1" value="0" aria-label="곡 진행률"></progress>
-      <canvas width="960" height="480" aria-label="음높이별 레인과 공, 다가오는 음표"></canvas>
+      <canvas aria-label="음높이별 레인과 공, 다가오는 음표"></canvas>
       <p class="notice" data-size hidden>레인을 읽기 어렵습니다. 가로로 돌리거나 더 큰 화면 또는 다른 파트를 선택하세요.</p>
       <div class="move-controls"><button type="button" data-command="up" aria-label="위 레인으로 이동">↑ 위로</button>
         <button type="button" data-command="down" aria-label="아래 레인으로 이동">↓ 아래로</button></div>

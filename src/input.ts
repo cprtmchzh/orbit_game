@@ -14,6 +14,11 @@ export function bindInput(root: HTMLElement, state: () => GameState | undefined,
   const keyboard = (event: KeyboardEvent) => {
     if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return
     if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable=true]')) return
+    if (event.repeat && (event.key === 'Enter' || event.key === ' ') &&
+        event.target instanceof HTMLButtonElement && root.contains(event.target)) {
+      event.preventDefault()
+      return
+    }
     const command = keyboardCommand(event.key, state())
     if (!command) return
     event.preventDefault()
