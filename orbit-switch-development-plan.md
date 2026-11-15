@@ -1,5 +1,7 @@
 # 궤도 스위치 개발 계획서
 
+> **v1 이력 문서.** 현재 개발은 [v2 개발 계획서](orbit-switch-development-plan-v2.md)와 [역할별 파일 소유권](orbit-switch-v2-agent-amendment.md)을 따른다. 기존 작업별 전환 결정은 [관리 이슈 #20](https://github.com/cprtmchzh/orbit_game/issues/20)에 기록했다.
+
 > **한 번 누르면 궤도가 바뀐다. 장애물을 피하며 기록을 늘리는 원버튼 생존 게임.**
 
 문서 버전: 1.0  
