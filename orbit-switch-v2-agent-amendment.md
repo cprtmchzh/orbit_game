@@ -1,5 +1,7 @@
 # 기존 에이전트 공통 추가 지시 — Orbit Switch v2
 
+**[수집 규칙 변경 #35](https://github.com/cprtmchzh/orbit_game/issues/35).** DEV-1은 음표 머리별 수집·놓침을 판정하고, DEV-2는 수집 목표와 점수·명중률을 보여 준다. DEV-3는 수집 규칙의 기록을 별도 저장한다. IMPROVE는 첫 음표를 보고 맞힐 수 있는지, 접촉 피드백과 결과 점수를 이해할 수 있는지 평가한다. 아래 회피 기준보다 이 변경과 [현행 기획서](orbit-switch-development-plan-v2.md)의 첫 규칙을 우선한다.
+
 기존 역할 프롬프트와 함께 전달한다. 게임 관련 지시가 충돌하면 이 추가 지시와 `orbit-switch-development-plan-v2.md`를 우선한다. 기존 권한·파일 소유·분리 브랜치·증거 기반 검수·사용자 승인 정책은 유지한다.
 
 ## 변경된 기준

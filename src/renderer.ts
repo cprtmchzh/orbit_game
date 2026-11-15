@@ -76,13 +76,5 @@ export function createRenderer(canvas: HTMLCanvasElement) {
     }
     disk(frame.player, '#8ce4ce')
     disk({ ...frame.player, radius: frame.player.radius * 0.36 }, '#192522')
-    if (frame.collision) {
-      const hit = frame.collision.noteHead
-      ctx.beginPath()
-      ctx.arc(hit.x, hit.y, hit.radius + 5, 0, Math.PI * 2)
-      ctx.strokeStyle = '#ffb89e'
-      ctx.lineWidth = 3
-      ctx.stroke()
-    }
   }
 }
