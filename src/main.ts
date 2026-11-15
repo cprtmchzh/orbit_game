@@ -26,6 +26,7 @@ let previousState: GameState = 'READY'
 let best = { progress: 0, cleared: false }
 let scoreKey = ''
 let busy = false
+let starting = false
 let error = ''
 let context: AudioContext | undefined
 let transport: ReturnType<typeof createTransport> | undefined
@@ -101,6 +102,7 @@ async function start(command: 'start'|'retry'|'resume') {
       (command === 'retry' && state !== 'FAILED' && state !== 'CLEARED' && state !== 'PAUSED')) return
   busy = true
   const generation = ++requestGeneration
+  starting = true
   try {
     const audio = audioContext()
     // The resume request must begin in the user's event handler, before awaiting other work.
@@ -121,13 +123,14 @@ async function start(command: 'start'|'retry'|'resume') {
     transport?.stop(game?.getSnapshot().songSec)
     ui.error('음악을 시작할 수 없습니다. ' + describe(cause))
   } finally {
-    if (requestGeneration === generation) busy = false
+    if (requestGeneration === generation) { busy = false; starting = false }
   }
 }
 
 function backToLibrary() {
   requestGeneration++
   busy = false
+  starting = false
   transport?.stop()
   game = undefined
   previousState = 'READY'
@@ -195,8 +198,8 @@ const ui = createUI(host, {
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    if (busy && game) { requestGeneration++; busy = false }
-    pause(true)
+    if (starting) { requestGeneration++; busy = false; starting = false }
+    pause(lastFrame !== undefined && performance.now() - lastFrame > 250)
   }
 }, { signal: listeners.signal })
 
