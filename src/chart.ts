@@ -84,7 +84,7 @@ export function buildChart(
   if (!included.size) throw new Error('음높이 파트가 필요합니다. 드럼만으로는 플레이할 수 없습니다.')
   const notes = source.notes.filter(n => included.has(n.trackId))
   const pitches = [...new Set(notes.map(n => n.pitch))].sort((a, b) => b - a)
-  if (pitches.length < 2) throw new Error('회피하려면 선택한 파트에 서로 다른 음높이가 2개 이상 있어야 합니다.')
+  if (pitches.length < 2) throw new Error('선택한 파트에 서로 다른 음높이가 2개 이상 있어야 합니다.')
   const spacing = (geometry.laneBottomY - geometry.laneTopY) / (pitches.length - 1)
   if (spacing < 2 * geometry.headRadius) throw new Error('음높이가 많아 음표가 겹칩니다. 더 적은 파트를 선택하세요.')
   const lanes = pitches.map((pitch, index) => ({ index, pitch, y: geometry.laneTopY + index * spacing }))

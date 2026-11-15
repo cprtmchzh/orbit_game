@@ -44,7 +44,29 @@ page.on('pageerror',error=>errors.push(error.message))
 page.on('console',msg=>{if(msg.type()==='error') errors.push(msg.text())})
 const button=name=>page.locator('[data-command="'+name+'"]')
 const status=text=>page.locator('[data-status]').filter({hasText:text}).waitFor()
-const decisions=[[-1.5,'up'],[-1.2,'up'],[.54,'down'],[.82,'up'],[4.82,'down'],[5.12,'up'],[7.6,'down'],[8.18,'up']]
+const decisions = [
+  [0.12, 'up'], [0.53, 'up'], [0.78, 'down'], [1.1, 'down'], [1.3, 'down'],
+  [2.1, 'up'], [2.53, 'down'], [2.7, 'down'], [3.1, 'up'], [3.6, 'up'],
+  [4.1, 'up'], [4.78, 'up'], [5.1, 'down'], [5.53, 'down'], [5.7, 'down'],
+  [6.03, 'down'], [6.28, 'up'], [6.6, 'up'], [7.1, 'up'], [7.3, 'up'],
+  [8.1, 'down'], [8.6, 'down'], [9.03, 'down'], [9.28, 'down'], [9.6, 'up'],
+  [10.03, 'up'], [10.2, 'up'], [10.6, 'down'],
+]
+async function finishRound(hits) {
+  await page.locator('[data-status]').filter({hasText:'연주 결과'}).waitFor({timeout:20000})
+  assert.equal(await page.locator('[data-score]').innerText(),hits+'점')
+  assert.match(await page.locator('[data-counts]').innerText(),new RegExp('맞힌 음표 '+hits+' / 24\\s+놓친 음표 '+(24-hits)))
+  const summary=await page.locator('[data-result]').innerText()
+  assert.ok(summary.includes('명중률 '+Math.floor(hits/24*100)+'%'))
+  return summary
+}
+
+async function retryRound() {
+  await button('retry').click()
+  await status('준비 주행')
+  assert.equal(await page.locator('[data-score]').innerText(),'0점')
+}
+
 async function clearViaReplay(){
   const observed=[]
   for(const [target,direction] of decisions){
@@ -55,8 +77,7 @@ async function clearViaReplay(){
     await page.keyboard.press(direction==='up'?'ArrowUp':'ArrowDown')
     observed.push(await page.evaluate(()=>{const s=window.audioProbe.current;return +(s.node.context.currentTime-s.at).toFixed(3)}))
   }
-  await status('클리어')
-  assert.match(await page.locator('[data-result]').innerText(),/100%/)
+  await finishRound(24)
   return observed
 }
 const result={browser:browser.version(),defaultSong:{},localSong:{}}
@@ -91,20 +112,16 @@ try {
   result.longFramePause=true
   await button('resume').click()
   await status('재개 준비')
-  await status('음표에 닿았습니다')
-  result.defaultSong.failure=await page.locator('[data-result]').innerText()
+  result.defaultSong.partial=await finishRound(6)
   offline=true;await context.setOffline(true)
-  // The newly scheduled source starts at song time 0 after the two-second run-up.
-  await button('retry').click()
-  await status('준비 주행')
-  result.defaultSong.clearInputs=await clearViaReplay()
   for(let i=0;i<20;i++){
-    await button('retry').click()
-    await status('준비 주행')
-    await status('음표에 닿았습니다')
-    if((i+1)%5===0)console.log('Default retries ending in failure:',i+1)
+    await retryRound()
+    await button('pause').click()
+    await status('일시정지')
   }
-  result.defaultSong.offlineRepeatedFailures=20
+  result.defaultSong.offlineRetriesFromPause=20
+  await retryRound()
+  result.defaultSong.perfectInputs=await clearViaReplay()
   await page.locator('[data-back]').click()
   await page.locator('[data-add]').click()
   const chart=JSON.parse(await readFile(path.join(dist,'songs/glass-steps.json'),'utf8'))
@@ -121,15 +138,13 @@ try {
   await page.locator('[data-register]').click()
   await page.locator('[data-title]').filter({hasText:chart.title}).waitFor()
   await button('start').click()
-  await status('음표에 닿았습니다')
-  result.localSong.failure=await page.locator('[data-result]').innerText()
-  await button('retry').click()
-  await status('준비 주행')
-  result.localSong.clearInputs=await clearViaReplay()
-  const records=await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('orbit-switch:v2:'))
+  result.localSong.partial=await finishRound(6)
+  await retryRound()
+  result.localSong.perfectInputs=await clearViaReplay()
+  const records=await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('orbit-switch:catch:v1:'))
     .map(key=>JSON.parse(localStorage.getItem(key))))
   assert.equal(records.length,2)
-  assert.ok(records.every(r=>r.cleared && r.progress===1))
+  assert.ok(records.every(r=>r.version===1 && r.hits===24 && r.totalNotes===24 && r.perfect))
   result.records=records
   result.audio=await page.evaluate(()=>{const {started,stopped,ended,peak}=window.audioProbe;return {started,stopped,ended,peak}})
   assert.equal(result.audio.peak,1)

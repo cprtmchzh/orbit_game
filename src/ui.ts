@@ -1,7 +1,7 @@
 import './style.css'
 import type { GameCommand, GameSnapshot, PlayableChart, SourceChart } from './contracts'
 import { bindInput } from './input'
-import { createRenderer, pitchLabel, readableLanes } from './renderer'
+import { createRenderer, readableLanes } from './renderer'
 
 export interface UIActions {
   selectSong(id: string): void
@@ -22,7 +22,6 @@ export interface LibraryView {
   importing?: boolean
   busy?: boolean
   error?: string
-  pathVerified?: boolean
 }
 
 function time(sec: number) {
@@ -53,7 +52,7 @@ export function createUI(root: HTMLElement, actions: UIActions) {
           <h3 data-title>곡을 선택하세요</h3>
           <p data-duration></p>
           <fieldset data-parts><legend>연주 파트</legend><div data-tracks></div></fieldset>
-          <p data-preview></p><p data-excluded></p><p data-verified></p>
+          <p data-preview></p><p data-excluded></p>
           <div class="actions"><button type="button" class="primary" data-command="start">게임 시작</button>
             <button type="button" class="primary" data-register hidden>이 곡 등록</button>
             <button type="button" data-cancel hidden>등록 취소</button></div>
@@ -65,12 +64,13 @@ export function createUI(root: HTMLElement, actions: UIActions) {
         <label>음표 차트<input type="file" accept=".json,application/json" data-chart required></label>
         <div class="actions"><button class="primary" type="submit">파일 확인</button><button type="button" data-close>닫기</button></div></form>
       </section>
-      <p class="instructions">↑ · ↓ 또는 W · S로 공을 옮겨 음표를 피하세요.</p>
+      <p class="instructions">↑ · ↓ 또는 W · S로 공을 옮겨 음표 머리를 맞히세요. 하나에 1점이며, 놓쳐도 곡은 계속됩니다.</p>
     </section>
     <section class="stage" data-stage hidden>
       <div class="stage-title"><div><h2 data-song></h2><p data-meta></p></div>
         <button type="button" data-command="pause">일시정지</button></div>
       <div class="status-line"><h3 tabindex="-1" data-status aria-live="polite"></h3><span data-clock></span></div>
+      <div class="score-line"><strong data-score></strong><span data-counts></span><span data-feedback></span></div>
       <progress max="1" value="0" aria-label="곡 진행률"></progress>
       <canvas aria-label="음높이별 레인과 공, 다가오는 음표"></canvas>
       <p class="notice" data-size hidden>레인을 읽기 어렵습니다. 가로로 돌리거나 더 큰 화면 또는 다른 파트를 선택하세요.</p>
@@ -93,6 +93,7 @@ export function createUI(root: HTMLElement, actions: UIActions) {
   const canvas = get<HTMLCanvasElement>('canvas'), draw = createRenderer(canvas)
   const song = get('[data-song]'), meta = get('[data-meta]'), status = get('[data-status]')
   const clock = get('[data-clock]'), progress = get<HTMLProgressElement>('progress')
+  const score = get('[data-score]'), counts = get('[data-counts]'), feedback = get('[data-feedback]')
   const pause = get('[data-command=pause]'), moves = get('.move-controls'), resume = get('[data-command=resume]')
   const retry = get('[data-command=retry]'), back = get('[data-back]'), result = get('[data-result]')
   const size = get('[data-size]')
@@ -176,7 +177,6 @@ export function createUI(root: HTMLElement, actions: UIActions) {
     get('[data-excluded]').textContent = excluded.length ? '제외 파트 · ' + excluded.map(item =>
       (src?.tracks.find(track => track.id === item.trackId)?.name ?? item.trackId) + ' (' +
       (item.reason === 'drums' ? '드럼' : '선택 안 함') + ', ' + item.noteCount + '음)').join(', ') : ''
-    get('[data-verified]').textContent = next.preview ? (next.pathVerified ? '완주 경로 검증됨' : '플레이 경로 미검증') : ''
     start.hidden = !!next.importing || picking
     cancel.hidden = register.hidden = !next.importing
     register.disabled = !next.preview || busy
@@ -207,7 +207,8 @@ export function createUI(root: HTMLElement, actions: UIActions) {
 
   const unbind = bindInput(el, () => frame?.state, cmd => actions.command(cmd))
 
-  function play(nextChart: PlayableChart, next: GameSnapshot, bestProgress?: number, bestCleared = false) {
+  function play(nextChart: PlayableChart, next: GameSnapshot, bestAccuracy?: number, bestPerfect = false) {
+    const previous = nextChart === chart ? frame : undefined
     if (chart !== nextChart || stage.hidden) {
       song.textContent = nextChart.source.title
       meta.textContent = '선택 파트 · ' + parts(nextChart) + '　/　' + nextChart.lanes.length + '개 레인'
@@ -219,14 +220,14 @@ export function createUI(root: HTMLElement, actions: UIActions) {
     chart = nextChart
     frame = next
     const playing = next.state === 'PLAYING' || next.state === 'LEAD_IN'
-    const ended = next.state === 'FAILED' || next.state === 'CLEARED'
+    const ended = next.state === 'CLEARED'
     if (lastState !== next.state) {
       moves.hidden = !playing
       pause.hidden = !playing && next.state !== 'RESUMING'
       resume.hidden = next.state !== 'PAUSED'
       retry.hidden = back.hidden = !ended && next.state !== 'PAUSED'
       const labels = { READY: '시작 준비', LEAD_IN: '준비 주행 · 지금 이동할 수 있어요', PLAYING: '플레이 중',
-        PAUSED: '일시정지', RESUMING: '재개 준비', FAILED: '음표에 닿았습니다', CLEARED: '클리어' }
+        PAUSED: '일시정지', RESUMING: '재개 준비', FAILED: '재생 중단', CLEARED: '연주 결과' }
       status.textContent = labels[next.state]
       if (ended || next.state === 'PAUSED') status.focus({ preventScroll: true })
       lastState = next.state
@@ -237,9 +238,21 @@ export function createUI(root: HTMLElement, actions: UIActions) {
     const line = shownTime + '　' + percent(next.progress)
     if (clock.textContent !== line) clock.textContent = line
     progress.value = next.progress
-    const failure = next.collision ? '실패 ' + next.collision.songSec.toFixed(2) + '초 · ' + pitchLabel(next.collision.noteHead.note.pitch) + '　' : ''
-    result.textContent = ended ? failure + '이번 진행률 ' + percent(next.progress) +
-      (bestProgress === undefined ? '' : '　최고 ' + percent(bestProgress)) + (bestCleared ? ' · 클리어 기록 있음' : '') : ''
+    if (!previous || previous.hits !== next.hits || previous.misses !== next.misses || previous.totalNotes !== next.totalNotes) {
+      score.textContent = next.hits + '점'
+      counts.textContent = '맞힌 음표 ' + next.hits + ' / ' + next.totalNotes + '　놓친 음표 ' + next.misses
+      const gained = previous ? next.hits - previous.hits : 0
+      feedback.textContent = gained > 0 ? '+' + gained + '점' :
+        previous && next.misses > previous.misses ? '놓침' : ''
+      feedback.getAnimations().forEach(animation => animation.cancel())
+      if (feedback.textContent && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        feedback.animate([{ opacity: 1, offset: 0.7 }, { opacity: 0 }], { duration: 700, fill: 'forwards' })
+      }
+    }
+    const summary = ended ? '명중률 ' + percent(next.totalNotes ? next.hits / next.totalNotes : 0) +
+      (bestAccuracy === undefined ? '' : '　최고 ' + Math.round(bestAccuracy * next.totalNotes) + '점 (' + percent(bestAccuracy) + ')') +
+      (bestPerfect ? ' · 전체 명중 기록 있음' : '') : ''
+    if (result.textContent !== summary) result.textContent = summary
     layout()
   }
 

@@ -97,17 +97,22 @@ export interface GameSnapshot extends AudioClockSample {
   readonly state: GameState
   /** Fraction of the playable audio segment, clamped to [0, 1]. Check state for clear. */
   readonly progress: number
+  /** Each normalized visual head is worth one point, including a merged unison. */
+  readonly hits: number
+  readonly misses: number
+  readonly totalNotes: number
   readonly player: Circle
   readonly movement: Movement | null
   /** At most one pending move. The last accepted direction replaces the previous pending direction. */
   readonly queuedDirection: Direction | null
   readonly visibleHeads: readonly VisibleHead[]
+  /** Reserved for legacy avoidance views; collecting a note does not emit a failure collision. */
   readonly collision: Collision | null
 }
 
 /** game.ts exports createGame(chart: PlayableChart): GameController.
  * Start/retry after a successful audio reservation at -2. Lead-in permits movement and contact.
- * Dispatch first advances to the input's songSec. Earliest contact wins over input or clear.
+ * Dispatch collects every touched head through the input time before acting on the new command.
  * Resume uses a frozen one-second hold, then continues from the previous song position.
  * Clear requires both audio end and passage beyond the last head's inclusive contact window.
  */

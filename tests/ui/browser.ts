@@ -16,13 +16,14 @@ function run() {
       offsetSec: 0, defaultTrackIds: ['m'], tracks: [{ id: 'm', name: '멜로디', kind: 'pitched' },
         { id: 'd', name: '드럼', kind: 'drums' }], notes: [] },
     selectedTrackIds: ['m'], lanes: [{ index: 0, pitch: 72, y: 80 }, { index: 1, pitch: 61, y: 380 }],
-    heads: [{ sourceIds: ['n0'], pitch: 72, laneIndex: 0, arrivalSec: 0, durationSec: 0.3 }],
+    heads: [{ sourceIds: ['n0'], pitch: 72, laneIndex: 0, arrivalSec: 0, durationSec: 0.3 },
+      { sourceIds: ['n1'], pitch: 61, laneIndex: 1, arrivalSec: 6, durationSec: 0.4 }],
     audioEndSec: 18, excludedTracks: [{ trackId: 'd', noteCount: 2, reason: 'drums' }]
   }
   const head: VisibleHead = { note: chart.heads[0], x: geometry.width - geometry.headRadius, y: 80, radius: geometry.headRadius }
   const frame: GameSnapshot = { state: 'LEAD_IN', songSec: -2, resumeRemainingSec: 0, progress: 0,
     player: { x: geometry.playerX, y: 144, radius: geometry.playerRadius }, movement: null,
-    queuedDirection: null, visibleHeads: [head], collision: null }
+    queuedDirection: null, visibleHeads: [head], collision: null, hits: 0, misses: 0, totalNotes: 2 }
   const model: LibraryView = { songs: [{ id: 'local', title: chart.source.title, local: true }], selectedId: 'local',
     source: chart.source, preview: chart, selectedTrackIds: ['m'] }
   const actions: string[] = []
@@ -34,7 +35,8 @@ function run() {
   const key = (value: string, repeat = false) => window.dispatchEvent(new KeyboardEvent('keydown', { key: value, repeat, bubbles: true }))
   ui.library(model)
   assert('metadata displayed as text', get('[data-title]').textContent === chart.source.title && !get('[data-title]').children.length)
-  assert('session and route status', get('.song-list').textContent!.includes('세션 곡') && get('[data-verified]').textContent!.includes('미검증'))
+  assert('session and new objective', get('.song-list').textContent!.includes('세션 곡') &&
+    get('.instructions').textContent!.includes('음표 머리를 맞히세요'))
   assert('duration, lane count and excluded parts', get('[data-duration]').textContent!.includes('0:18') &&
     get('[data-preview]').textContent!.includes('2개 레인') && get('[data-excluded]').textContent!.includes('2음'))
   button('[data-add]').click()
@@ -75,12 +77,20 @@ function run() {
   assert('pause and resume actions', moving().length === 2 && actions.at(-1) === 'resume')
   ui.play(chart, { ...frame, state: 'RESUMING', resumeRemainingSec: 0.6 })
   assert('resume countdown', get('[data-clock]').textContent!.includes('1초'))
-  ui.play(chart, { ...frame, state: 'FAILED', songSec: 4, progress: 0.2,
-    collision: { songSec: 4, player: frame.player, noteHead: head } }, 0.5, true)
+  ui.play(chart, { ...frame, state: 'PLAYING', songSec: 0, hits: 1, visibleHeads: [] })
+  assert('hit adds one and allows further input', get('[data-score]').textContent === '1점' &&
+    get('[data-feedback]').textContent === '+1점' && !down.closest('[hidden]'))
+  ui.play(chart, { ...frame, state: 'PLAYING', songSec: 7, hits: 1, misses: 1, visibleHeads: [] })
+  assert('miss keeps round playing', get('[data-status]').textContent === '플레이 중' &&
+    get('[data-counts]').textContent!.includes('놓친 음표 1') && get('[data-result]').textContent === '')
+  ui.play(chart, { ...frame, state: 'CLEARED', songSec: 18, progress: 1, hits: 1, misses: 1, visibleHeads: [] }, 1, true)
   button('[data-command=retry]').click()
-  assert('failure and retry', get('[data-result]').textContent!.includes('4.00초') && actions.at(-1) === 'retry')
-  ui.play(chart, { ...frame, state: 'CLEARED', songSec: 18, progress: 1 }, 1, true)
-  assert('clear and best', get('[data-status]').textContent === '클리어' && get('[data-result]').textContent!.includes('최고 100%'))
+  assert('result and retry', get('[data-status]').textContent === '연주 결과' && actions.at(-1) === 'retry')
+  assert('accuracy and best show separate runs', get('[data-result]').textContent!.includes('명중률 50%') &&
+    get('[data-result]').textContent!.includes('최고 2점 (100%)'))
+  ui.play(chart, frame)
+  assert('new run resets score and feedback', get('[data-score]').textContent === '0점' &&
+    get('[data-feedback]').textContent === '' && get('[data-result]').textContent === '')
   assert('layout within viewport', root.scrollWidth <= document.documentElement.clientWidth)
   ui.destroy()
   key('ArrowUp')

@@ -4,7 +4,7 @@ import { buildChart } from './chart'
 import type { GameCommand, GameController, GameState, PlayableChart } from './contracts'
 import { createGame } from './game'
 import { decodeSong, loadDefault, prepareSong, type Song } from './songs'
-import { createRecordStore, recordKey } from './storage'
+import { createRecordStore, recordKey, type BestRecord } from './storage'
 import { createUI } from './ui'
 
 interface Selection {
@@ -23,7 +23,7 @@ let active: Selection | undefined
 let draft: Selection | undefined
 let game: GameController | undefined
 let previousState: GameState = 'READY'
-let best = { progress: 0, cleared: false }
+let best: BestRecord | undefined
 let scoreKey = ''
 let busy = false
 let starting = false
@@ -54,7 +54,6 @@ function showLibrary() {
   ui.library({
     songs: [...songs.values()], selectedId: chosen?.song.id, source: chosen?.song.source,
     selectedTrackIds: chosen?.tracks, preview: chosen?.chart, importing: !!draft, busy, error,
-    pathVerified: !!chosen && !chosen.song.local && chosen.tracks.length === 1 && chosen.tracks[0] === 'melody',
   })
 }
 
@@ -76,12 +75,12 @@ function present() {
   const chart = active?.chart
   if (!game || !chart) return
   const snapshot = game.getSnapshot()
-  if ((snapshot.state === 'FAILED' || snapshot.state === 'CLEARED') && snapshot.state !== previousState) {
+  if (snapshot.state === 'CLEARED' && snapshot.state !== previousState) {
     transport?.stop(snapshot.songSec)
-    best = store.finish(scoreKey, snapshot.progress, snapshot.state === 'CLEARED')
+    best = store.finish(scoreKey, snapshot.hits, snapshot.totalNotes)
   }
   previousState = snapshot.state
-  ui.play(chart, snapshot, best.progress, best.cleared)
+  ui.play(chart, snapshot, best && best.hits / best.totalNotes, best?.perfect)
 }
 
 function pause(useLastFrame: boolean) {
@@ -99,7 +98,7 @@ async function start(command: 'start'|'retry'|'resume') {
   if (busy || draft || !selected?.chart) return
   const state = game?.getSnapshot().state
   if ((command === 'start' && game) || (command === 'resume' && state !== 'PAUSED') ||
-      (command === 'retry' && state !== 'FAILED' && state !== 'CLEARED' && state !== 'PAUSED')) return
+      (command === 'retry' && state !== 'CLEARED' && state !== 'PAUSED')) return
   busy = true
   const generation = ++requestGeneration
   starting = true
