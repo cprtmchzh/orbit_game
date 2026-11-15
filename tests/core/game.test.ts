@@ -42,7 +42,7 @@ describe('accumulated contact angles', () => {
   })
 })
 
-describe('single-obstacle game', () => {
+describe('game loop', () => {
   it.each([30, 60, 120])('stops on the first contact at %i Hz', hz => {
     const game = running()
     frames(game, 1000, 3100, hz)
@@ -72,11 +72,19 @@ describe('single-obstacle game', () => {
     game.dispatch('switch', 1500)
     expect(game.getSnapshot().angleRad).toBe(before.angleRad)
     expect(before.angleRad).toBe(500 * speed)
-    frames(game, 1500, 6000, hz)
+    function evade(from: number, to: number) {
+      for (let frame = 0; from + frame * 1000 / hz < to; frame++) {
+        const atMs = from + frame * 1000 / hz
+        game.update(atMs)
+        const snapshot = game.getSnapshot()
+        if (snapshot.visibleObstacles[0]?.lane === snapshot.lane) game.dispatch('switch', atMs)
+      }
+      game.update(to)
+    }
+    evade(1500, 6000)
     expect(game.getSnapshot().angleRad).toBeCloseTo(2 * Math.PI, 12)
-    game.dispatch('switch', 6000)
-    frames(game, 6000, 11000, hz)
-    expect(game.getSnapshot()).toMatchObject({ state: 'RUNNING', survivalMs: 10000, visibleObstacles: [] })
+    evade(6000, 11000)
+    expect(game.getSnapshot()).toMatchObject({ state: 'RUNNING', survivalMs: 10000 })
     expect(game.getSnapshot().angleRad).toBeCloseTo(4 * Math.PI, 12)
   })
   it('shows the first obstacle early enough and removes it after its contact interval', () => {
@@ -86,8 +94,9 @@ describe('single-obstacle game', () => {
     expect(game.getSnapshot().visibleObstacles).toHaveLength(0)
     frames(game, 1199, 1250)
     expect(game.getSnapshot().visibleObstacles).toHaveLength(1)
+    const first = game.getSnapshot().visibleObstacles[0]
     frames(game, 1250, 3500)
-    expect(game.getSnapshot().visibleObstacles).toHaveLength(0)
+    expect(game.getSnapshot().visibleObstacles).not.toContainEqual(first)
   })
   it('uses result entry time for the retry lock and resets the round once', () => {
     const game = running()

@@ -1,14 +1,11 @@
 import { angularSpeedRadPerMs as speed, timing } from './config'
 import type { Collision, GameCommand, GameController, GameSnapshot, GameState, Lane, Obstacle } from './contracts'
-import { collisionWindow, contactHalfWidth, firstContact } from './rules'
+import { createPatternSource } from './patterns'
+import { collisionWindow, firstContact } from './rules'
 
-/** A fixed opening obstacle for the first playable loop. The seed is reserved for the pattern generator. */
-export function createGame(_seed?: number): GameController {
-  const opening: Obstacle = Object.freeze({
-    lane: 'inner',
-    centerRad: timing.firstSafeMs * speed + contactHalfWidth('inner'),
-  })
-  const obstacles = [opening]
+export function createGame(seed?: number): GameController {
+  let patterns: ReturnType<typeof createPatternSource>
+  let obstacles: Obstacle[] = []
   let state: GameState = 'READY'
   let lane: Lane = 'inner'
   let survivalMs = 0
@@ -41,13 +38,18 @@ export function createGame(_seed?: number): GameController {
       state = 'RUNNING'
     }
     const nextMs = atMs - runOriginMs
+    if (nextMs >= patterns.nextAtMs) obstacles.push(...patterns.next().obstacles)
     const hit = firstContact(lane, survivalMs * speed, nextMs * speed, obstacles)
     if (hit) finish(hit, atMs)
     else survivalMs = nextMs
+    const angleRad = collision?.angleRad ?? survivalMs * speed
+    obstacles = obstacles.filter(obstacle => collisionWindow(obstacle).endRad >= angleRad)
   }
 
   function countdown(atMs: number, reset: boolean) {
     if (reset) {
+      patterns = createPatternSource(seed ?? Math.floor(Math.random() * 0x1_0000_0000))
+      obstacles = patterns.next().obstacles
       lane = 'inner'
       survivalMs = 0
       collision = null
